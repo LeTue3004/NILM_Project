@@ -56,7 +56,7 @@ void sendBluetoothMessages() {
         if (!bluetoothDisplayed) {
             tft.setTextColor(COLOR_WHITE);
             tft.setTextSize(2);
-            tft.fillRect(0, 100 + 5, tft.width(), 20, COLOR_BLACK);
+            tft.fillRect(0, 80 + 5, tft.width(), 20, COLOR_BLACK);
             tft.drawCentreString("Bluetooth connected!", 120, 80 + 5, 1);
             bluetoothDisplayed = true;
         }
@@ -94,7 +94,7 @@ void connectToWiFi() {
     Serial.print("IP Address: "); Serial.println(WiFi.localIP());
     tft.setTextColor(COLOR_WHITE);
     tft.setTextSize(2);
-    tft.fillRect(0, 100 + 5, tft.width(), 20, COLOR_BLACK);
+    tft.fillRect(0, 80 + 5, tft.width(), 20, COLOR_BLACK);
     tft.drawCentreString("Wifi connected!", 120, 80 + 5, 1);
 
     // Dừng Bluetooth sau 3 giây
