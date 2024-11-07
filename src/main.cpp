@@ -15,10 +15,10 @@ bool bluetoothDisplayed = false;
 const long interval = 5000; // Thời gian chờ 5 giây
 
 const char* devices[] = {
-    "Led", "Fan", "Refrigerator", "Air Purifier", "Juicer", "Dryer", "Laptop Charger", "iPhone Charger"
+    "Led", "Fan", "Refrigerator", "Air Purifier", "Fruit juicer", "Hair dryer", "Laptop Charger", "iPhone Charger"
 };
 
-const float power[] = {10, 50, 200, 30, 100, 200, 65, 20}; // Thay đổi giá trị thực tế
+const float power[] = {5, 46, 75, 38, 150, 2300, 45, 18}; // Thay đổi giá trị thực tế
 
 #define MAX_IMAGE_WIDTH 240
 #define COLOR_WHITE 0xFFFF
