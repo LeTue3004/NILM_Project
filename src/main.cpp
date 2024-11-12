@@ -3,6 +3,19 @@
 #include <WiFi.h>
 #include "SPI.h"
 #include <TFT_eSPI.h>
+#include <PubSubClient.h>
+#include <HardwareSerial.h>
+HardwareSerial SerialPort(2);
+// Use RX2, TX2 
+// MQTT Broker information
+const char* mqtt_broker = "fish.rmq.cloudamqp.com";
+const int mqtt_port = 1883; 
+const char* mqtt_username = "muxzhxjv:muxzhxjv"; 
+const char* mqtt_password = "pMrQHB43ZQsjHKudlYcQPzcI2y7P9IwC"; 
+// Khai báo đối tượng WiFi và MQTT client
+WiFiClient espClient;
+PubSubClient client(espClient);
+int num = 0;
 
 BluetoothSerial SerialBT;
 TFT_eSPI tft = TFT_eSPI();
@@ -30,8 +43,27 @@ void customDelay(unsigned long delayTime) {
     }
 }
 
+void setupMQTT() {
+  client.setServer(mqtt_broker, mqtt_port);
+  
+  while (!client.connected()) {
+    
+    if (client.connect("ESP32Client", mqtt_username, mqtt_password)) {
+    } else {
+      delay(100);
+    }
+  }
+  Serial.println("Server connected!");
+  tft.setTextColor(COLOR_WHITE);
+  tft.setTextSize(2);
+  tft.fillRect(0, 80 + 5, tft.width(), 20, COLOR_BLACK);
+  tft.drawCentreString("Server connected!", 120, 80 + 5, 1);
+}
+
 void setup() {
     Serial.begin(115200);
+    SerialPort.begin(115200, SERIAL_8N1, 16, 17);// UART comunication
+
     SerialBT.begin("ESP32 Bluetooth Connection Established");
     Serial.println("Initializing ESP32...");
     tft.setRotation(1);
@@ -116,48 +148,70 @@ void handleBluetoothInput() {
         }
     }
 }
-
-void loop() {
-    static unsigned long beginMillis = 0;
-    if (millis() - beginMillis > interval) {
-        beginMillis = millis();
-        if (!wifiConnected) {
-            sendBluetoothMessages();
-            handleBluetoothInput();
-        } else {
-            Serial.println("Wifi connected!");
-            }
-
-        float sumPower = 0;
-        for (int i = 0; i < 8; i++)
-        {
-            float presentPower = 0;
-            bool isActive = true;
-            // check device is active.
-            if (isActive)
-            {
-                presentPower = power[i];
-            }
-            presentPower = power[i];
-            sumPower += presentPower;
-            // Print power consumption for each device
-            tft.setTextColor(COLOR_WHITE);
-            tft.setTextSize(1);
-
-            tft.drawCentreString(devices[i], 60, 100 + 45 + 17 * i, 2);
-            tft.drawCentreString(" : ", 120, 100 + 45 + 17 * i, 2);
-
-            char powerString[50];
-            snprintf(powerString, sizeof(powerString), " %d W", (int)presentPower);
-            tft.drawCentreString(powerString, 180, 100 + 45 + 17 * i, 2);
-        }
-
-        tft.drawCentreString("Total", 60, 100 + 45 + 17 * 8, 2);
-
-        tft.drawCentreString(" : ", 120, 100 + 45 + 17 * 8, 2);
-        char sumPowerString[50];
-        snprintf(sumPowerString, sizeof(sumPowerString), " %d W", (int)sumPower);
-        tft.drawCentreString(sumPowerString, 180, 100 + 45 + 17 * 8, 2);
+String invert_label_encode(int encoded_value) {
+    String binary_string = String(encoded_value, BIN);
+    while (binary_string.length() < 8) {
+        binary_string = "0" + binary_string;  // Bổ sung các số 0 để đủ 8 bit
     }
+    return binary_string;
+}
+String received = ""; // String received from esp32 
+String binary_string  = "00000000"; // String received from esp32 to binary
+String totalPower = "0";
+void loop() {
+    customDelay(10000);// 10s per time
+    // esp32 communication
+    if (SerialPort.available()) { // Kiểm tra xem có dữ liệu đến không
+        received = SerialPort.readStringUntil('\n'); // Đọc dữ liệu đến ký tự newline
+        received.trim();
+        int commaIndex = received.indexOf(',');
+        if (commaIndex > 0) {
+            String encoded_devices = received.substring(0, commaIndex);
+            int encoded_value = encoded_devices.toInt();
+            totalPower = received.substring(commaIndex + 1);
+        Serial.print("Received: "); // In ra thông báo
+        Serial.println(received);    // In dữ liệu nhận được lên Serial Monitor
+        binary_string = invert_label_encode(encoded_value);
+        }
+    }
+    if (!wifiConnected) {
+        sendBluetoothMessages();
+        handleBluetoothInput();
+    } else if (!client.connected()){
+        Serial.println("Wifi connected!");
+        setupMQTT();
+    } else {
+        client.loop();
+        client.publish("data/1", received.c_str()); // Thay "your_topic" bằng tên chủ đề thực tế
+        customDelay(1000);
+        }
+    float sumPower = 0;
+    
+    for (int i = 0; i < 8; i++)
+    {
+        float presentPower = 0;
+        
+        if (binary_string[i] == '1') // check device is active.
+        {
+            presentPower = power[i];
+        }
+        sumPower += presentPower;
+        // Print power consumption for each device
+        tft.setTextColor(COLOR_WHITE);
+        tft.setTextSize(1);
+
+        tft.drawCentreString(devices[i], 60, 100 + 45 + 17 * i, 2);
+        tft.drawCentreString(" : ", 120, 100 + 45 + 17 * i, 2);
+
+        char powerString[50];
+        snprintf(powerString, sizeof(powerString), " %d W", (int)presentPower);
+        tft.drawCentreString(powerString, 180, 100 + 45 + 17 * i, 2);
+    }
+
+    tft.drawCentreString("Total", 60, 100 + 45 + 17 * 8, 2);
+    tft.drawCentreString(" : ", 120, 100 + 45 + 17 * 8, 2);
+    char sumPowerString[50];
+    snprintf(sumPowerString, sizeof(sumPowerString), " %d W", (int)sumPower);
+    tft.drawCentreString(sumPowerString, 180, 100 + 45 + 17 * 8, 2);
 }
 
